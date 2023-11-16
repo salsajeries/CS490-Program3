@@ -1,43 +1,4 @@
 /*
-/*
-CS 490 Program 2
-Salwa Jeries
-10/17/2023
-
-Dev Environment Used: VScode
-
-This program simulated creating a Process node and puts it into both a FIFO queue and a Binary Min Heap.
-The user will be prompted to input the number of process nodes to be randomly generated. Then, using a
-defined Process struct, a node is generated with a process ID, priority (randomly generated integer between
-0-100), sleep time in milliseconds (randomly generated integer between 100-2000), and a description string.
-Once this process node is generated, it is pushed to a VecDeque based on FIFO as well as a Binary Min Heap,
-ordered based on priority. The pushes are verified by checking the size of the queue and heap. Then, the nodes
-are dequeued and popped from the queue/heap respectively in the proper order. As each item is dequeued/popped,
-the process node fields are printed to the screen. This demonstrates that they were added to the queue/heap in
-the correct order. The sizes of the queue/heap are printed to the screen to verify that they have both been
-drained correctly before quitting the program.
-*/
-use std::io;
-use rand::Rng;
-use std::collections::VecDeque;
-use std::collections::BinaryHeap;
-use std::cmp::Reverse;
-
-/*
-Process Node Struct
-
-process_id: unsigned int
-priority: unsigned int between 0-100
-sleep_time: (in ms) unsigned int between 100-2000
-description: string
-*/
-#[derive(Debug, Eq, PartialEq, Clone)]
-struct Process {
-    process_id: u32,
-    priority: u32,
-    sleep_time: u32,
-    description: String,
-}
 
 /*
 Generate New Process Node 
@@ -61,20 +22,6 @@ fn generate_process(process_id: u32) -> Process {
     }
 }
 
-
-// Enforces ordering for MinHeap based on priority value of process node
-impl Ord for Process {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.priority.cmp(&other.priority)
-    }
-}
-
-// Enforces partial ordering rules for MinHeap for process nodes
-impl PartialOrd for Process {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 /* Main Function */
 fn main() {
@@ -130,31 +77,71 @@ fn main() {
 
 }*/
 
+
+/*
+CS 490 Program 2
+Salwa Jeries
+10/17/2023
+
+Dev Environment Used: VScode
+
+This program simulated creating a Process node and puts it into both a FIFO queue and a Binary Min Heap.
+The user will be prompted to input the number of process nodes to be randomly generated. Then, using a
+defined Process struct, a node is generated with a process ID, priority (randomly generated integer between
+0-100), sleep time in milliseconds (randomly generated integer between 100-2000), and a description string.
+Once this process node is generated, it is pushed to a VecDeque based on FIFO as well as a Binary Min Heap,
+ordered based on priority. The pushes are verified by checking the size of the queue and heap. Then, the nodes
+are dequeued and popped from the queue/heap respectively in the proper order. As each item is dequeued/popped,
+the process node fields are printed to the screen. This demonstrates that they were added to the queue/heap in
+the correct order. The sizes of the queue/heap are printed to the screen to verify that they have both been
+drained correctly before quitting the program.
+*/
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use std::collections::BinaryHeap;
+use std::cmp::Reverse;
 use rand::{thread_rng, Rng};
 
-// A struct to represent a process
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+/*
+Process Node Struct
+
+id: unsigned int
+priority: unsigned int between 0-100
+time_slice: (in ms) unsigned int between 200-1000
+*/
+#[derive(Debug, PartialEq, Eq)]
 struct Process {
     id: u32,
     priority: u32,
     time_slice: u32,
 }
 
+// Enforces ordering for MinHeap based on priority value of process node
+impl Ord for Process {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
+}
+
+// Enforces partial ordering rules for MinHeap for process nodes
+impl PartialOrd for Process {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 // Function to simulate the execution of a process
-fn execute_process(process: &Process, thread_name: &str) {
+fn execute_process(process: &Reverse<Process>, thread_name: &str) {
     println!(
         "{}: executed process {}, pri: {}, for {} ms",
-        thread_name, process.id, process.priority, process.time_slice
+        thread_name, process.0.id, process.0.priority, process.0.time_slice
     );
-    thread::sleep(Duration::from_millis(process.time_slice as u64));
+    thread::sleep(Duration::from_millis(process.0.time_slice as u64));
 }
 
 // Consumer function for each thread
-fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, thread_name: &'static str, completed_processes: &mut u32) {
+fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, thread_name: &'static str, completed_processes: &mut u32) {
     loop {
 
         // Let process be the next item in the priority queue (binary heap top element)
@@ -181,8 +168,9 @@ fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, thread_name: &'static 
 }
 
 // Producer function
-fn producer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, n: u32, s: u64, m: u32) {
+fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u64, m: u32) {
     let mut rng = thread_rng();
+    let mut counter: u32 = 0;
 
     println!("... producer is starting its work ...");
 
@@ -191,13 +179,14 @@ fn producer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, n: u32, s: u64, m: u32
 
         for _ in 0..n {
             let process = Process {
-                id: rng.gen(),
+                id: counter,
                 priority: rng.gen_range(0..100),
-                time_slice: rng.gen_range(200..1001),
+                time_slice: rng.gen_range(200..1000),
             };
 
             let mut heap = heap.lock().unwrap();
-            heap.push(process);
+            heap.push(Reverse(process));
+            counter += 1;
         }
 
         thread::sleep(Duration::from_millis(s));
@@ -206,6 +195,7 @@ fn producer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, n: u32, s: u64, m: u32
     println!("... producer has finished: {} nodes were generated ...", n * m);
 }
 
+/* Main Function */
 fn main() {
     // User input
     let n = 10; // number of process nodes to generate each time
