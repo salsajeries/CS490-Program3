@@ -1,4 +1,5 @@
 /*
+/*
 CS 490 Program 2
 Salwa Jeries
 10/17/2023
@@ -49,7 +50,7 @@ process_id: u32 = process ID of node to be generated
 */
 fn generate_process(process_id: u32) -> Process {
     let priority = rand::thread_rng().gen_range(0..=100);
-    let sleep_time = rand::thread_rng().gen_range(100..=2000);
+    let sleep_time = rand::thread_rng().gen_range(200..=1000);
     let description = format!("Process Node: {}", process_id);
 
     Process {
@@ -127,4 +128,114 @@ fn main() {
     println!("\nGoodbye!");
 
 
+}*/
+
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+use std::collections::BinaryHeap;
+use rand::{thread_rng, Rng};
+
+// A struct to represent a process
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Process {
+    id: u32,
+    priority: u32,
+    time_slice: u32,
+}
+
+// Function to simulate the execution of a process
+fn execute_process(process: &Process, thread_name: &str) {
+    println!(
+        "{}: executed process {}, pri: {}, for {} ms",
+        thread_name, process.id, process.priority, process.time_slice
+    );
+    thread::sleep(Duration::from_millis(process.time_slice as u64));
+}
+
+// Consumer function for each thread
+fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, thread_name: &'static str, completed_processes: &mut u32) {
+    loop {
+
+        // Let process be the next item in the priority queue (binary heap top element)
+        let process;
+        {
+            let mut heap = heap.lock().unwrap();
+            process = heap.pop();
+        }
+
+        match process {
+            // Process exists and is valid, execute process
+            Some(p) => {
+                execute_process(&p, thread_name);
+                //let mut count = completed_processes.lock().unwrap();
+                *completed_processes += 1;
+            }
+            // Process does not exist, heap must be empty
+            None => {
+                println!("{} has completed and executed {} processes", thread_name, completed_processes);
+                break;
+            }
+        }
+    }
+}
+
+// Producer function
+fn producer_thread(heap: Arc<Mutex<BinaryHeap<Process>>>, n: u32, s: u64, m: u32) {
+    let mut rng = thread_rng();
+
+    println!("... producer is starting its work ...");
+
+    for phase in 1..=m {
+        println!("... producer is sleeping ...");
+
+        for _ in 0..n {
+            let process = Process {
+                id: rng.gen(),
+                priority: rng.gen_range(0..100),
+                time_slice: rng.gen_range(200..1001),
+            };
+
+            let mut heap = heap.lock().unwrap();
+            heap.push(process);
+        }
+
+        thread::sleep(Duration::from_millis(s));
+    }
+
+    println!("... producer has finished: {} nodes were generated ...", n * m);
+}
+
+fn main() {
+    // User input
+    let n = 10; // number of process nodes to generate each time
+    let s = 1000; // sleep time in ms between generations
+    let m = 4; // number of times the producer should generate N nodes.
+
+    // Create a shared heap wrapped in a Mutex
+    let heap = Arc::new(Mutex::new(BinaryHeap::new()));
+
+    // Create a counter for completed processes shared between consumers
+    let mut completed_processes_1: u32 = 0;
+    let mut completed_processes_2: u32 = 0;
+
+    // Spawn producer thread
+    let heap_clone = Arc::clone(&heap);
+    let producer = thread::spawn(move || producer_thread(heap_clone, n, s, m));
+    // Sleep briefly before starting the producer to ensure there are nodes in the heap
+    thread::sleep(Duration::from_millis(1000));
+
+    // Spawn consumer threads
+    let heap_clone = Arc::clone(&heap);
+    let consumer1 = thread::spawn(move || consumer_thread(heap_clone, "Consumer 1", &mut completed_processes_1));
+
+    let heap_clone = Arc::clone(&heap);
+    let consumer2 = thread::spawn(move || consumer_thread(heap_clone, "Consumer 2", &mut completed_processes_2));
+
+    // Wait for all threads to finish
+    producer.join().unwrap();
+    consumer1.join().unwrap();
+    consumer2.join().unwrap();
+
+    println!("Both consumers have completed.");
 }

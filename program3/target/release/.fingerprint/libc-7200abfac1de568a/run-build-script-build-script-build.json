@@ -1,0 +1,1 @@
+{"rustc":927955034769998173,"features":"","target":0,"profile":0,"path":0,"deps":[[8109820400748453361,"build_script_build",false,11816063731040762427]],"local":[{"RerunIfChanged":{"output":"release/build/libc-7200abfac1de568a/output","paths":["build.rs"]}}],"rustflags":[],"metadata":0,"config":0,"compile_kind":0}
