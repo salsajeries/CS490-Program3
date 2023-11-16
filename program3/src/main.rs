@@ -223,7 +223,7 @@ fn main() {
     let heap_clone = Arc::clone(&heap);
     let producer = thread::spawn(move || producer_thread(heap_clone, n, s, m));
     // Sleep briefly before starting the producer to ensure there are nodes in the heap
-    thread::sleep(Duration::from_millis(1000));
+    thread::sleep(Duration::from_millis(500));
 
     // Spawn consumer threads
     let heap_clone = Arc::clone(&heap);
