@@ -1,91 +1,14 @@
 /*
-
-/*
-Generate New Process Node 
-
-Randomly generates a new process node based on a given process ID, random
-priority value (0-100), random sleep time in ms (100-2000), and description
-(generated based on process_id).
-
-process_id: u32 = process ID of node to be generated
-*/
-fn generate_process(process_id: u32) -> Process {
-    let priority = rand::thread_rng().gen_range(0..=100);
-    let sleep_time = rand::thread_rng().gen_range(200..=1000);
-    let description = format!("Process Node: {}", process_id);
-
-    Process {
-        process_id,
-        priority,
-        sleep_time,
-        description,
-    }
-}
-
-
-/* Main Function */
-fn main() {
-
-    // User input number of nodes to generate
-    println!("Enter the number of process nodes to generate:");
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("You entered an invalid measure.\n");
-    let nodes: u32 = input.trim().parse().expect("You entered an invalid measure.\n");
-
-    // Create a new VecDeque & Binary Min Heap
-    let mut vec_deque: VecDeque<Process> = VecDeque::new();
-    let mut binary_heap: BinaryHeap<Reverse<Process>> = BinaryHeap::new();
-    
-    // Initialize queue and heap with new process nodes
-    println!("\nNow creating and adding {} process nodes to a Queue and to a binary minheap", nodes);
-    for i in 1..=nodes {
-        let current: Process = generate_process(i);
-        
-        vec_deque.push_back(current.clone());
-        binary_heap.push(std::cmp::Reverse(current.clone()));
-    }
-
-    // Verify size of queue and heap
-    println!("Verifying. The queue contains {} elements", vec_deque.len());
-    println!("Verifying. The heap contains {} elements", binary_heap.len());
-
-    // Drain queue and print process nodes as they are removed
-    println!("\nNow, draining the Queue, one process at a time ...");
-    for _i in 1..=nodes {
-        if let Some(item) = vec_deque.pop_front() {
-            println!("Pid: {:10}, pri: {:10}, sleep: {:10}, desc: {:10}", item.process_id, item.priority, item.sleep_time, item.description);
-        }
-    }
-
-    // Drain min heap and print process nodes as they are removed
-    println!("\nNow, draining the MinHeap, one process at a time ...");
-    for _i in 1..=nodes {
-        if let Some(item) = binary_heap.pop() {
-            println!("Pid: {:10}, pri: {:10}, sleep: {:10}, desc: {:10}", item.0.process_id, item.0.priority, item.0.sleep_time, item.0.description);
-        }
-    }
-    
-    // Verify that the queue and heap are drained
-    println!("\nVecDeque Size: {}", vec_deque.len());
-    println!("Binary Min Heap Size: {}", binary_heap.len());
-
-    // Quit statement
-    println!("\nGoodbye!");
-
-
-}*/
-
-
-/*
-CS 490 Program 2
+CS 490 Program 3
 Salwa Jeries
-10/17/2023
+11/16/2023
 
 Dev Environment Used: VScode
 
-This program simulated creating a Process node and puts it into both a FIFO queue and a Binary Min Heap.
+This program simulated creating a number of Process nodes, placing them in a Binary Heap, and "executing"
+the processes with 2 consumer threads. 
+
+
 The user will be prompted to input the number of process nodes to be randomly generated. Then, using a
 defined Process struct, a node is generated with a process ID, priority (randomly generated integer between
 0-100), sleep time in milliseconds (randomly generated integer between 100-2000), and a description string.
@@ -131,17 +54,36 @@ impl PartialOrd for Process {
     }
 }
 
-// Function to simulate the execution of a process
+/*
+Execute Process
+
+Simulate executing a process by sleeping for the "time_slice" duration (ms),
+the current thread cannot work on another process during this time.
+
+process: &Reverse<Process> = current process to be "executed"
+thread_name: &str = name of current thread calling the function
+*/
 fn execute_process(process: &Reverse<Process>, thread_name: &str) {
     println!(
-        "{}: executed process {}, pri: {}, for {} ms",
+        "{}: executed process {}, pri: {}, for {} ms",                              // Display current thread, process, and process info
         thread_name, process.0.id, process.0.priority, process.0.time_slice
     );
-    thread::sleep(Duration::from_millis(process.0.time_slice as u64));
+    thread::sleep(Duration::from_millis(process.0.time_slice as u64));              // Sleep for "time_slice" duration to simulate execution
 }
 
-// Consumer function for each thread
+/*
+Consumer Thread
+
+Control request process to utilize resources to execute a process. Pulls highest priority process
+(lowest value) from the top of the heap to process next. Thread is complete when the heap is
+empty and there are no more processes to pull.
+
+heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>> = binary heap of current processes
+thread_name: &'static str = name of thread (Consumer 1 or 2)
+completed_processes: &mut u32 = total number of processes completed so far for the current thread
+*/
 fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, thread_name: &'static str, completed_processes: &mut u32) {
+    
     loop {
 
         // Let process be the next item in the priority queue (binary heap top element)
@@ -155,11 +97,11 @@ fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, thread_name: 
             // Process exists and is valid, execute process
             Some(p) => {
                 execute_process(&p, thread_name);
-                //let mut count = completed_processes.lock().unwrap();
                 *completed_processes += 1;
             }
             // Process does not exist, heap must be empty
             None => {
+                // Signal that thread is completed, display how many processes executed total for this thread
                 println!("{} has completed and executed {} processes", thread_name, completed_processes);
                 break;
             }
@@ -167,16 +109,30 @@ fn consumer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, thread_name: 
     }
 }
 
-// Producer function
-fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u64, m: u32) {
-    let mut rng = thread_rng();
-    let mut counter: u32 = 0;
+/*
+Producer Thread
 
+Randomly generates "n" new process nodes for "m" generations. Delay between
+generations for "s" milliseconds. When nodes are generated, push them to the
+binary heap where they will be sorted by priority (ascending order)
+
+heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>> = binary heap of current processes
+n: u32 = number of process nodes to generate each time
+s: u64 = sleep time (ms) between generations
+m: u32 = number of times the producer should generate "n" nodes
+*/
+fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u64, m: u32) {
+    
+    let mut rng = thread_rng();     // Random number generator
+    let mut counter: u32 = 0;       // Num of threads created, used for "id"
     println!("... producer is starting its work ...");
 
-    for phase in 1..=m {
+    for _phase in 1..=m {
+
+        // Beginning of new generation phase
         println!("... producer is sleeping ...");
 
+        // Generate "n" process nodes
         for _ in 0..n {
             let process = Process {
                 id: counter,
@@ -184,16 +140,18 @@ fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u6
                 time_slice: rng.gen_range(200..1000),
             };
 
-            let mut heap = heap.lock().unwrap();
-            heap.push(Reverse(process));
-            counter += 1;
+            let mut heap = heap.lock().unwrap();    // Unlock heap to add new process
+            heap.push(Reverse(process));            // Push process to the heap
+            counter += 1;                           // Increment process count
         }
 
-        thread::sleep(Duration::from_millis(s));
+        thread::sleep(Duration::from_millis(s));    // Delay between generation phases
     }
 
+    // Completed producer thread
     println!("... producer has finished: {} nodes were generated ...", n * m);
 }
+
 
 /* Main Function */
 fn main() {
@@ -215,17 +173,19 @@ fn main() {
     // Sleep briefly before starting the producer to ensure there are nodes in the heap
     thread::sleep(Duration::from_millis(500));
 
-    // Spawn consumer threads
+    // Spawn consumer1 thread
     let heap_clone = Arc::clone(&heap);
     let consumer1 = thread::spawn(move || consumer_thread(heap_clone, "Consumer 1", &mut completed_processes_1));
 
+    // Spawn consumer2 thread
     let heap_clone = Arc::clone(&heap);
     let consumer2 = thread::spawn(move || consumer_thread(heap_clone, "Consumer 2", &mut completed_processes_2));
 
-    // Wait for all threads to finish
+    // Process all threads
     producer.join().unwrap();
     consumer1.join().unwrap();
     consumer2.join().unwrap();
 
+    // Threads completed, print completion message
     println!("Both consumers have completed.");
 }
