@@ -6,19 +6,9 @@ Salwa Jeries
 Dev Environment Used: VScode
 
 This program simulated creating a number of Process nodes, placing them in a Binary Heap, and "executing"
-the processes with 2 consumer threads. 
-
-
-The user will be prompted to input the number of process nodes to be randomly generated. Then, using a
-defined Process struct, a node is generated with a process ID, priority (randomly generated integer between
-0-100), sleep time in milliseconds (randomly generated integer between 100-2000), and a description string.
-Once this process node is generated, it is pushed to a VecDeque based on FIFO as well as a Binary Min Heap,
-ordered based on priority. The pushes are verified by checking the size of the queue and heap. Then, the nodes
-are dequeued and popped from the queue/heap respectively in the proper order. As each item is dequeued/popped,
-the process node fields are printed to the screen. This demonstrates that they were added to the queue/heap in
-the correct order. The sizes of the queue/heap are printed to the screen to verify that they have both been
-drained correctly before quitting the program.
+the processes with 2 consumer threads.
 */
+use std::io;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -125,12 +115,12 @@ fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u6
     
     let mut rng = thread_rng();     // Random number generator
     let mut counter: u32 = 0;       // Num of threads created, used for "id"
-    println!("... producer is starting its work ...");
+    println!("\n... producer is starting its work ...");
 
     for _phase in 1..=m {
 
         // Beginning of new generation phase
-        println!("... producer is sleeping ...");
+        println!("\n... producer is sleeping ...\n");
 
         // Generate "n" process nodes
         for _ in 0..n {
@@ -149,16 +139,43 @@ fn producer_thread(heap: Arc<Mutex<BinaryHeap<Reverse<Process>>>>, n: u32, s: u6
     }
 
     // Completed producer thread
-    println!("... producer has finished: {} nodes were generated ...", n * m);
+    println!("\n... producer has finished: {} nodes were generated ...\n", n * m);
 }
 
 
 /* Main Function */
 fn main() {
-    // User input
-    let n = 10; // number of process nodes to generate each time
-    let s = 1000; // sleep time in ms between generations
-    let m = 4; // number of times the producer should generate N nodes.
+    
+    // TEST INPUTS
+    //let n = 10;   // number of process nodes to generate each time
+    //let s = 1000; // sleep time in ms between generations
+    //let m = 4;    // number of times the producer should generate N nodes.
+
+    // User input number of times the producer should generate N nodes
+    println!("Enter number of generation phases for the producer:");
+    let mut phases = String::new();
+    io::stdin()
+        .read_line(&mut phases)
+        .expect("You entered an invalid measure.\n");
+    let m: u32 = phases.trim().parse().expect("You entered an invalid measure.\n");
+
+    // User input sleep time in ms between generations
+    println!("Enter sleep time in ms for the producer to pause between generation phases:");
+    let mut sleeptime = String::new();
+    io::stdin()
+        .read_line(&mut sleeptime)
+        .expect("You entered an invalid measure.\n");
+    let s: u64 = sleeptime.trim().parse().expect("You entered an invalid measure.\n");
+
+    // User input number of process nodes to generate each time
+    println!("Enter number of processes to generate each phase:");
+    let mut num_proc = String::new();
+    io::stdin()
+        .read_line(&mut num_proc)
+        .expect("You entered an invalid measure.\n");
+    let n: u32 = num_proc.trim().parse().expect("You entered an invalid measure.\n");
+
+    println!("Starting Simulation");
 
     // Create a shared heap wrapped in a Mutex
     let heap = Arc::new(Mutex::new(BinaryHeap::new()));
@@ -179,7 +196,7 @@ fn main() {
 
     // Spawn consumer2 thread
     let heap_clone = Arc::clone(&heap);
-    let consumer2 = thread::spawn(move || consumer_thread(heap_clone, "Consumer 2", &mut completed_processes_2));
+    let consumer2 = thread::spawn(move || consumer_thread(heap_clone, "\tConsumer 2", &mut completed_processes_2));     // "\t" for print purposes
 
     // Process all threads
     producer.join().unwrap();
@@ -187,5 +204,5 @@ fn main() {
     consumer2.join().unwrap();
 
     // Threads completed, print completion message
-    println!("Both consumers have completed.");
+    println!("\nBoth consumers have completed.");
 }
