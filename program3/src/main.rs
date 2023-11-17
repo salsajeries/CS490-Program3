@@ -6,7 +6,16 @@ Salwa Jeries
 Dev Environment Used: VScode
 
 This program simulated creating a number of Process nodes, placing them in a Binary Heap, and "executing"
-the processes with 2 consumer threads.
+the processes with 2 consumer threads. The user specifies how many generation phases there will be (m),
+how many nodes per generation phase should be made (n), and the sleep time between generation phases (s).
+Then, the producer thread will go through this generation process of creating "n" nodes, "m" times, with
+a delay of "s" milliseconds between phases. After a short delay when the producer thread begins (this is to
+ensure there are nodes in the heap to work with), the consumer threads begin working. Each thread pulls one
+process from the top of the binary heap, meaning it is the highest priority (lowest value). Then, it will
+simulate execution of the process by delaying that current thread for the "time_slice" amount of time.
+Both consumer threads work concurrently "executing" processes until the heap is empty, after which the
+program finishes. A type of <Mutex> is used to lock the shared data (heap) so that there are no conflicts
+in the data as processes are pushed and popped.
 */
 use std::io;
 use std::sync::{Arc, Mutex};
